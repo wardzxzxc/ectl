@@ -4,20 +4,21 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"strings"
 
 	_ "github.com/marcboeker/go-duckdb"
 )
 
 func InspectParquet(filepath string) (*InspectResult, error) {
-	f, err := os.Open(filepath)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
+	var fileSize int64
+	isS3 := strings.HasPrefix(filepath, "s3://")
 
-	info, err := f.Stat()
-	if err != nil {
-		return nil, err
+	if !isS3 {
+		info, err := os.Stat(filepath)
+		if err != nil {
+			return nil, err
+		}
+		fileSize = info.Size()
 	}
 
 	// Open in-memory DuckDB
@@ -26,6 +27,17 @@ func InspectParquet(filepath string) (*InspectResult, error) {
 		return nil, err
 	}
 	defer db.Close()
+
+	if isS3 {
+		_, err = db.Exec("INSTALL httpfs;")
+		if err != nil {
+			return nil, err
+		}
+		_, err = db.Exec("LOAD httpfs;")
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	// Get row count
 	var rowCount int64
@@ -95,7 +107,7 @@ func InspectParquet(filepath string) (*InspectResult, error) {
 
 	return &InspectResult{
 		RowCount:      rowCount,
-		FileSizeBytes: info.Size(),
+		FileSizeBytes: fileSize,
 		Columns:       columns,
 		Preview:       preview,
 	}, nil
