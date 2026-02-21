@@ -10,6 +10,14 @@ import (
 )
 
 func InspectParquet(filepath string) (*InspectResult, error) {
+	return inspectFile(filepath, fmt.Sprintf("read_parquet('%s')", filepath))
+}
+
+func InspectCSV(filepath string) (*InspectResult, error) {
+	return inspectFile(filepath, fmt.Sprintf("read_csv_auto('%s')", filepath))
+}
+
+func inspectFile(filepath, readerExpr string) (*InspectResult, error) {
 	var fileSize int64
 	isS3 := strings.HasPrefix(filepath, "s3://")
 
@@ -21,7 +29,6 @@ func InspectParquet(filepath string) (*InspectResult, error) {
 		fileSize = info.Size()
 	}
 
-	// Open in-memory DuckDB
 	db, err := sql.Open("duckdb", "")
 	if err != nil {
 		return nil, err
@@ -41,15 +48,13 @@ func InspectParquet(filepath string) (*InspectResult, error) {
 
 	// Get row count
 	var rowCount int64
-	query := fmt.Sprintf("SELECT COUNT(*) FROM read_parquet('%s')", filepath)
-	err = db.QueryRow(query).Scan(&rowCount)
+	err = db.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM %s", readerExpr)).Scan(&rowCount)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get columns
-	query = fmt.Sprintf("DESCRIBE SELECT * FROM read_parquet('%s')", filepath)
-	rows, err := db.Query(query)
+	rows, err := db.Query(fmt.Sprintf("DESCRIBE SELECT * FROM %s", readerExpr))
 	if err != nil {
 		return nil, err
 	}
@@ -70,21 +75,18 @@ func InspectParquet(filepath string) (*InspectResult, error) {
 	}
 
 	// Get first 5 rows
-	query = fmt.Sprintf("SELECT * FROM read_parquet('%s') LIMIT 5", filepath)
-	rows, err = db.Query(query)
+	rows, err = db.Query(fmt.Sprintf("SELECT * FROM %s LIMIT 5", readerExpr))
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	// Get column names for mapping
 	columnNames, err := rows.Columns()
 	if err != nil {
 		return nil, err
 	}
 	preview := []map[string]any{}
 	for rows.Next() {
-		// Create slice to scan into
 		values := make([]any, len(columnNames))
 		valuePtrs := make([]any, len(columnNames))
 		for i := range values {
@@ -96,11 +98,9 @@ func InspectParquet(filepath string) (*InspectResult, error) {
 			return nil, err
 		}
 
-		// Convert to map
 		row := make(map[string]any)
 		for i, colName := range columnNames {
-			val := values[i]
-			row[colName] = val
+			row[colName] = values[i]
 		}
 		preview = append(preview, row)
 	}

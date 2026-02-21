@@ -65,7 +65,7 @@ func RenderTable(result *data.InspectResult) error {
 	header := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("99")).
-		Render(fmt.Sprintf("\n📊 Parquet File Inspector\n\nRows: %d | Size: %.2f MB\n",
+		Render(fmt.Sprintf("\n📊 File Inspector\n\nRows: %d | Size: %.2f MB\n",
 			result.RowCount,
 			float64(result.FileSizeBytes)/(1024*1024)))
 

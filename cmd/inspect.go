@@ -25,16 +25,16 @@ var inspectCmd = &cobra.Command{
 		switch {
 		case strings.HasSuffix(filePath, ".parquet"):
 			result, err = data.InspectParquet(filePath)
+		case strings.HasSuffix(filePath, ".csv"):
+			result, err = data.InspectCSV(filePath)
 		default:
-			fmt.Errorf("unsupported file format: %s", filePath)
+			return fmt.Errorf("unsupported file format: %s", filePath)
 		}
-
-		output.RenderTable(result)
 
 		if err != nil {
 			return err
 		}
 
-		return err
+		return output.RenderTable(result)
 	},
 }
